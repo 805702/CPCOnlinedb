@@ -75,6 +75,14 @@ function existingUserToken(user){
     return jwt.sign({idUser, phoneUser, roleUser, firstNameUser, dateOfBirthUser, genderUser, emailUser, lastNameUser}, process.env.TOKENSECRET)
 }
 
+createLog = async(action)=>{
+    try{
+        return await db.sequelize
+        .query(`insert into logs (nameEvent) values('${action}')`)
+        .then(result=>true)
+    }catch(err){throw new Error(err)}
+}
+
 exports.loginPhone = async(req, res, next)=>{
     try{
         const phone = req.body.phone
@@ -111,8 +119,9 @@ exports.login = async (req, res, next)=>{
                 if(user.length===1 && user[0].roleUser !=='patient'){
                     const valid = await bcrypt.compare(pwd,user[0].passwordUser)
                     if(valid){
-                        const logs = false//write to the logs table
-                        if(!logs) console.log('there was a problem login this user signin')
+
+                        const logs = createLog('signin')//write to the logs table
+                        if(logs!==true) console.log('there was a problem login this user signin')
                         return res.json({
                             role:user[0].roleUser,
                             token:existingUserToken(user[0])
@@ -129,7 +138,8 @@ exports.login = async (req, res, next)=>{
                         const user = await findUser(phone)
                         if(user.length===1 && user[0].roleUser==='patient'){
                             const upDate = await updateOTP(otp.idOTP) //make OTP code invalid
-                            const logs = false//write to the logs table
+                            const logs = createLog('signin')//write to the logs table
+                            if(logs!==true) console.log('there was a problem login this user signin')
                             if(!upDate) console.log('there was a problem removing OTPCode')
                             if(!logs) console.log('there was a problem login this user signin')
                             return res.json({
