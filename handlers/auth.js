@@ -1,0 +1,218 @@
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+
+const db = require('../models');
+
+exports.register = async (req, res, next)=>{
+    try{
+        const user = req.body.pwd
+        const hashed = await bcrypt.hash(user, 10);
+        // user.pwd=hashed
+
+        const ans = await bcrypt.compare(user, hashed)
+
+        res.json(hashed);
+    }catch(err){
+        return next(err);
+    }
+}
+
+
+function generateOTPCode(){
+    return Math.floor(Math.random() * 9000) + 1000;
+}
+
+createOTP = async(phone)=>{
+    try{
+        return await db.sequelize
+        .query(`INSERT INTO OTP (code,endDateTimeCode,phone) VALUES (${generateOTPCode()},"${generateEndDateTime()}", ${phone});`)
+        .then(result=>{return true})
+    }catch(err){throw new Error(err)}
+}
+
+findUser = async (phone)=>{
+    try{
+        return await db.sequelize.query(`select * from user where phoneUser=${phone} and statusUser='active'`, {type:db.sequelize.QueryTypes.SELECT})
+        .then(result=>result)
+    }catch(err){throw new Error(err)}
+}
+
+findOTP = async (phone)=>{
+    try{
+        return await db.sequelize
+        .query(`select * from otp where phone=${phone} order by initiatedDateTimeCode desc`,{
+            type:db.sequelize.QueryTypes.SELECT
+        })
+        .then(result=>{
+            return result[0]
+        })
+    }catch(err){throw new Error(err)}
+}
+
+findValidOTP = async (phone)=>{
+    try{
+        return await db.sequelize
+        .query(`select * from otp where phone=${phone} and status='valid' order by initiatedDateTimeCode desc`,{
+            type:db.sequelize.QueryTypes.SELECT
+        })
+        .then(result=>{
+            return result[0]
+        })
+    }catch(err){throw new Error(err)}
+}
+
+
+updateOTP = async(otpId)=>{
+    try{
+        return await db.sequelize
+        .query(`update otp set status='invalid' where idOTP=${otpId}`)
+        .then(result=>{return true})
+    }catch(err) {throw new Error(err)}
+}
+
+function existingUserToken(user){
+    const {idUser, phoneUser, roleUser, firstNameUser, dateOfBirthUser, genderUser, emailUser, lastNameUser}=user
+    return jwt.sign({idUser, phoneUser, roleUser, firstNameUser, dateOfBirthUser, genderUser, emailUser, lastNameUser}, process.env.TOKENSECRET)
+}
+
+exports.loginPhone = async(req, res, next)=>{
+    try{
+        const phone = req.body.phone
+        const result = await findUser(phone)
+        if(result.length===0 || result[0].roleUser ==='patient'){
+            //before you write a new code in the db delete the previous one.
+            //make previous otpCode for this number invalid
+            const otp = await findOTP(phone)
+            let  upDate=''
+            if(otp!==undefined) 
+            upDate = await updateOTP(otp.idOTP)
+            if(upDate){
+                const createdOtp = await createOTP(phone)
+                if(createdOtp===true){
+                    //insert api to send code to user here
+                    return res.json({method:'code'})
+                } else throw new Error("Sequelize result for Insert is more than 2 in array")
+            }else throw new Error('Could not update previous OTP to invalid')
+        }
+        return res.json({method:'password'})
+    }catch(err){next(err);}
+}
+
+
+exports.login = async (req, res, next)=>{
+    try{
+        const phone =req.body.phone;
+        const pwd = req.body.pwd;
+        const method = req.body.method;
+
+        switch(method){
+            case 'password':
+                let user = await findUser(phone)
+                if(user.length===1 && user[0].roleUser !=='patient'){
+                    const valid = await bcrypt.compare(pwd,user[0].passwordUser)
+                    if(valid){
+                        const logs = false//write to the logs table
+                        if(!logs) console.log('there was a problem login this user signin')
+                        return res.json({
+                            role:user[0].roleUser,
+                            token:existingUserToken(user[0])
+                        })
+                        //prepare jwt and return
+                    } else throw new Error ('Invalid Password')
+                } else throw new Error('Many users with same phone')
+                break;
+            case 'code':
+                let otp = await findValidOTP(phone)
+                console.log(otp)
+                if(otp!==undefined){
+                    if(Number(pwd)===Number(otp.code)){
+                        const user = await findUser(phone)
+                        if(user.length===1 && user[0].roleUser==='patient'){
+                            const upDate = await updateOTP(otp.idOTP) //make OTP code invalid
+                            const logs = false//write to the logs table
+                            if(!upDate) console.log('there was a problem removing OTPCode')
+                            if(!logs) console.log('there was a problem login this user signin')
+                            return res.json({
+                                role:'patient',
+                                token:existingUserToken(user[0])
+                            })
+                        } 
+                        const roleUser='visitor'
+                        const token = jwt.sign({phone, roleUser}, process.env.TOKENSECRET)
+                        return res.json({
+                            role:'visitor',
+                            token:token
+                        })//generate visitor jwt and send as response
+                    }else throw new Error('Invalid code')
+                }else throw new Error('No otp code for this number. resend code')
+                break;
+            default:
+                return next(err);
+                break;
+        }
+
+    }catch(err){return next(err);}
+}
+
+//write function to generate code between 1000 and 9999 and replace in the OTP query
+
+generateEndDateTime =()=>{
+    let now = new Date().toUTCString().split(' GMT')[0].split(' ')
+    switch(now[2]){
+        case 'Jan':
+            now[2]= 01;
+            break;
+        case 'Feb':
+            now[2]= 02;
+            break;
+        case 'Mar':
+            now[2]= 03;
+            break;
+        case 'Apr':
+            now[2]= 04;
+            break;
+        case 'May':
+            now[2]= 05;
+            break;
+        case 'Jun':
+            now[2]= 06;
+            break;
+        case 'Jul':
+            now[2]= 07;
+            break;
+        case 'Aug':
+            now[2]= 08;
+            break;
+        case 'Sep':
+            now[2]= 09;
+            break;
+        case 'Oct':
+            now[2]= 10;
+            break;
+        case 'Nov':
+            now[2]= 11;
+            break;
+        case 'Dec':
+            now[2]= 12;
+            break;
+        default: break;
+    }
+
+    // SELECT DATE_ADD("2017-06-15 09:34:21", INTERVAL 3 MINUTE);
+
+    let time = now[4].split(':')
+    time[0]=(Number(time[0])+1)%24
+    time=time[0]+':'+time[1]+':'+time[2]
+    now = now[3]+'-'+now[2]+'-'+now[1]+' '+time
+    return now;
+    // try{
+    //     let ans =  await db.sequelize.query(`select DATE_ADD("${now}", INTERVAL 3 MINUTE)`,{type:db.sequelize.QueryTypes.SELECT})
+    //     .then(result=>result)
+
+    //     let key=Object.keys(ans[0])
+    //     return await ans[0][key[0]]
+    // }catch{
+    //     return now
+    // }
+
+}
