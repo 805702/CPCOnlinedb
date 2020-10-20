@@ -76,12 +76,29 @@ dbPayment=async(amount, payingPhone, payingService, idMedicalExamDemand,t)=>{
                 ${amount},
                 ${payingPhone},
                 '${payingService}',
-                ${idMedicalExam}
+                ${idMedicalExamDemand}
             )`,{
                 type:db.sequelize.QueryTypes.INSERT,
                 transaction:t
             }
         ).then(result=>result[0])
+    }catch(err){throw new Error(err)}
+}
+
+dbMedicalExamDemand_has_Examination = async(idMedicalExamDemand, examIdlist, t)=>{
+    try{
+        return examIdlist.map(examId=>{
+            return await db.sequelize
+            .query(`insert into MedicalExamDemand_has_Examination (idMedicalExamDemand, idExamination)
+                values(
+                    ${idMedicalExamDemand},
+                    ${examId}
+                )`,{
+                    types:db.sequelize.QueryTypes.INSERT,
+                    transaction:t
+                }
+            ).then(result=>result[0])
+        })
     }catch(err){throw new Error(err)}
 }
 
@@ -134,11 +151,12 @@ createUser=async(iden,t)=>{
     }catch(err){throw new Error(err)}
 }
 
-createDemandTransaction=async(identification, medPersonnel,demandAmount, payingPhone, payingService, t)=>{
+createDemandTransaction=async(identification, medPersonnel,demandAmount, payingPhone, payingService, examIdlist, t)=>{
     let userExist = await dbUser(identification, t)
     let medExist = await dbMedPersonnel(medPersonnel, t)
     let demandExist = await dbDemand(userExist, medExist, demandAmount, t)
-    let payment = await dbPayment(demandAmount, payingPhone, payingService, demandExist, t)
+    let paymentExist = await dbPayment(demandAmount, payingPhone, payingService, demandExist, t)
+    let medExamDemandHasExamExist = await dbMedicalExamDemand_has_Examination(demandExist, examIdlist, t)
 }
 
 exports.createTextDemand=async(req, res, next)=>{
