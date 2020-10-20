@@ -2,6 +2,24 @@ const db = require('../models')
 const { Transaction } = require('sequelize')
 const Sequelize = require('sequelize')
 
+generateSIN=async(t)=>{
+    try{
+        let stopGeneration=false;
+        let newSIN=0
+        do {
+            newSIN = Math.floor(Math.random() * 90000000) + 10000000;
+            let res= awaitdb.sequelize.query(`select * from MedicalExamDemand where MedicalExamDemand.SIN='${newSIN}'`,{
+                type:db.sequelize.QueryTypes.SELECT,
+                transaction:t
+            })
+            .then(result=>{
+                if (result.length===0) stopGeneration=true
+            })
+
+        }while (!stopGeneration);
+        return newSIN;
+    }catch(err){throw new Error(err)}
+}
 
 dbUser =async (iden, t)=>{
     try{
@@ -28,6 +46,42 @@ dbMedPersonnel = async(med, t)=>{
 
         if(medP.length!==1)return medP[0].idMedicalPersonnel
         else return await createMedPersonnel(med, t)
+    }catch(err){throw new Error(err)}
+}
+
+dbDemand=async(idUser, idMedicalPersonnel, demandAmount, t)=>{
+    try{
+        return await db.sequelize
+        .query(`insert into MedicalExamDemand (entryMethod, SIN, demandAmount, idUser, idMedicalPersonnel, idAgency)
+            values(
+                'text',
+                '${await generateSIN(t)}',
+                ${demandAmount},
+                ${idUser},
+                ${idMedicalPersonnel},
+                ${1}
+            )`,{
+                type:db.sequelize.QueryTypes.SELECT,
+                transaction:t
+        }).then(result=>result[0])
+
+    }catch(err){throw new Error(err)}
+}
+
+dbPayment=async(amount, payingPhone, payingService, idMedicalExamDemand,t)=>{
+    try{
+        return await db.sequelize
+        .query(`insert into payment (amount, payingPhone, payingService, idMedicalExam)
+            values(
+                ${amount},
+                ${payingPhone},
+                '${payingService}',
+                ${idMedicalExam}
+            )`,{
+                type:db.sequelize.QueryTypes.INSERT,
+                transaction:t
+            }
+        ).then(result=>result[0])
     }catch(err){throw new Error(err)}
 }
 
@@ -80,9 +134,11 @@ createUser=async(iden,t)=>{
     }catch(err){throw new Error(err)}
 }
 
-createDemandTransaction=async(identification, medPersonnel, t)=>{
+createDemandTransaction=async(identification, medPersonnel,demandAmount, payingPhone, payingService, t)=>{
     let userExist = await dbUser(identification, t)
     let medExist = await dbMedPersonnel(medPersonnel, t)
+    let demandExist = await dbDemand(userExist, medExist, demandAmount, t)
+    let payment = await dbPayment(demandAmount, payingPhone, payingService, demandExist, t)
 }
 
 exports.createTextDemand=async(req, res, next)=>{
@@ -105,7 +161,7 @@ exports.createTextDemand=async(req, res, next)=>{
             entryMethod
         } = req.body
 
-        const createExists = createDemandTransaction(identification, medPersonnel, t)
+        await createDemandTransaction(identification, medPersonnel, t)
         t.commit()
         t.afterCommit(()=>{
             res.json({userId: userExist})
