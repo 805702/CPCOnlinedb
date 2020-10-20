@@ -3,6 +3,9 @@ const bcrypt = require('bcryptjs');
 
 const db = require('../models');
 
+//work on adding cron jobs to make otp codes invalid
+//work on generating the correct generateEndDateTime
+
 exports.register = async (req, res, next)=>{
     try{
         const user = req.body.pwd
@@ -119,13 +122,9 @@ exports.login = async (req, res, next)=>{
                 if(user.length===1 && user[0].roleUser !=='patient'){
                     const valid = await bcrypt.compare(pwd,user[0].passwordUser)
                     if(valid){
-
                         const logs = createLog('signin')//write to the logs table
                         if(logs!==true) console.log('there was a problem login this user signin')
-                        return res.json({
-                            role:user[0].roleUser,
-                            token:existingUserToken(user[0])
-                        })
+                        return res.json({ role:user[0].roleUser, token:existingUserToken(user[0]) })
                         //prepare jwt and return
                     } else throw new Error ('Invalid Password')
                 } else throw new Error('Many users with same phone')
@@ -142,17 +141,11 @@ exports.login = async (req, res, next)=>{
                             if(logs!==true) console.log('there was a problem login this user signin')
                             if(!upDate) console.log('there was a problem removing OTPCode')
                             if(!logs) console.log('there was a problem login this user signin')
-                            return res.json({
-                                role:'patient',
-                                token:existingUserToken(user[0])
-                            })
+                            return res.json({ role:'patient', token:existingUserToken(user[0]) })//generate patient token
                         } 
                         const roleUser='visitor'
                         const token = jwt.sign({phone, roleUser}, process.env.TOKENSECRET)
-                        return res.json({
-                            role:'visitor',
-                            token:token
-                        })//generate visitor jwt and send as response
+                        return res.json({ role:'visitor', token:token })//generate visitor jwt and send as response
                     }else throw new Error('Invalid code')
                 }else throw new Error('No otp code for this number. resend code')
                 break;
@@ -163,8 +156,6 @@ exports.login = async (req, res, next)=>{
 
     }catch(err){return next(err);}
 }
-
-//write function to generate code between 1000 and 9999 and replace in the OTP query
 
 generateEndDateTime =()=>{
     let now = new Date().toUTCString().split(' GMT')[0].split(' ')
@@ -208,21 +199,10 @@ generateEndDateTime =()=>{
         default: break;
     }
 
-    // SELECT DATE_ADD("2017-06-15 09:34:21", INTERVAL 3 MINUTE);
 
     let time = now[4].split(':')
     time[0]=(Number(time[0])+1)%24
     time=time[0]+':'+time[1]+':'+time[2]
     now = now[3]+'-'+now[2]+'-'+now[1]+' '+time
     return now;
-    // try{
-    //     let ans =  await db.sequelize.query(`select DATE_ADD("${now}", INTERVAL 3 MINUTE)`,{type:db.sequelize.QueryTypes.SELECT})
-    //     .then(result=>result)
-
-    //     let key=Object.keys(ans[0])
-    //     return await ans[0][key[0]]
-    // }catch{
-    //     return now
-    // }
-
 }
