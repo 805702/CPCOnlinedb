@@ -148,26 +148,29 @@ dbPayment=async(amount, payingPhone, payingService, idMedicalExamDemand,t)=>{
 
 dbMedicalExamDemand_has_Examination = async(idMedicalExamDemand, examIdlist, t)=>{
     try{
-        return examIdlist.map(async(examId)=>{
-            try{
-                return await db.sequelize
-                .query(`insert into MedicalExamDemand_has_Examination (idMedicalExamDemand, idExamination)
-                    values(
-                        ${idMedicalExamDemand},
-                        ${examId}
-                    )`,{
-                        types:db.sequelize.QueryTypes.INSERT,
-                        transaction:t
-                    }
-                ).then(result=>{return {idIntermediary:result[0], examId:examId}})
-            }catch(err){throw new Error(err)}
-        })
+        let returnList=[]
+        for (let index = 0; index < examIdlist.length; index++) {
+            const element = examIdlist[index];
+            await dbExamExist(element,t)
+            await db.sequelize
+            .query(`insert into MedicalExamDemand_has_Examination (idMedicalExamDemand, idExamination)
+                values(
+                    ${idMedicalExamDemand},
+                    ${element}
+                )`,{
+                    types:db.sequelize.QueryTypes.INSERT,
+                    transaction:t
+                }
+            ).then(result=>{returnList.push({idIntermediary:result[0], examId:element})})
+
+            if(returnList.length === examIdlist.length) return returnList
+        }
     }catch(err){throw new Error(err)}
 }
 
 examsDueDate = async(examId, t)=>{
     try{
-        if(Number(examId)===NaN)throw new Error('examID is not a number')
+        await dbExamExist(examId, t)
         return await db.sequelize
         .query(`select daysToResult from examination where idExamination = ${examId}`,{
             type:db.sequelize.QueryTypes.SELECT,
@@ -181,23 +184,27 @@ examsDueDate = async(examId, t)=>{
 
 dbMedicalExamResult = async(idMedExamDemandHasExamList, t)=>{
     try{
-        return idMedExamDemandHasExamList.map(async(medExamHasExamObj)=>{
-            try{
-                let examDue = await examsDueDate(medExamHasExamObj.examId,t)
-                let initialDate = MySQLDateFormater(new Date.now().toUTCString(), examDue)
-                
-                return await db.sequelize
-                .query(`insert into MedicalExamResult (initialDueDate, dueDate, idMedExamDemandExamination) 
-                values(
-                    '${initialDate}',
-                    '${initialDate}',
-                    ${medExamHasExamObj.idIntermediary}
-                )`,{
-                    type:db.sequelize.QueryTypes.INSERT,
-                    transaction, t
-                }).then(result=>result[0])
-            }catch(err){throw new Error(err)}
-        })
+        let returnList=[]
+        for (let index = 0; index < idMedExamDemandHasExamList.length; index++) {
+            const element = idMedExamDemandHasExamList[index];
+            let examDelay = await examsDueDate(element.examId, t)
+            let initialDate = MySQLDateFormater(new Date.now().toUTCString(), examDelay)
+
+            await db.sequelize
+            .query(`insert into MedicalExamResult (initialDueDate, dueDate, idMedExamDemandExamination) 
+            values(
+                '${initialDate}',
+                '${initialDate}',
+                ${element.idIntermediary}
+            )`,{
+                type:db.sequelize.QueryTypes.INSERT,
+                transaction, t
+            }).then(result=>{
+                returnList.push(result[0])
+            })
+            
+            if(returnList.length === idMedExamDemandHasExamList.length) return returnList
+        }
     }catch(err){throw new Error(err)}
 }
 
@@ -247,6 +254,19 @@ createUser=async(iden,t)=>{
         ).then(result=>result[0])
 
         return newUser
+    }catch(err){throw new Error(err)}
+}
+
+dbExamExist=async(examId, t)=>{
+    try{
+        return await db.sequelize.query(`select * from examination where idExamination=${examId} and statusExamination='active'`,{
+            type:db.sequelize.QueryTypes.SELECT,
+            transaction:t
+        })
+        .then(result=>{
+            if(result.length===1) return true
+            throw new Error('the examination does not exist')
+        })
     }catch(err){throw new Error(err)}
 }
 
