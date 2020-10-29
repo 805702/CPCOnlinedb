@@ -25,7 +25,7 @@ function generateOTPCode(){
     return Math.floor(Math.random() * 9000) + 1000;
 }
 
-createOTP = async(phone)=>{
+async function createOTP (phone){
     try{
         return await db.sequelize
         .query(`INSERT INTO OTP (code,endDateTimeCode,phone) VALUES (${generateOTPCode()},"${generateEndDateTime()}", ${phone});`)
@@ -33,14 +33,16 @@ createOTP = async(phone)=>{
     }catch(err){throw new Error(err)}
 }
 
-findUser = async (phone)=>{
+async function findUser(phone){
     try{
-        return await db.sequelize.query(`select * from user where phoneUser=${phone} and statusUser='active'`, {type:db.sequelize.QueryTypes.SELECT})
+        return await db.sequelize.query(`select * from user where phoneUser=${phone} and statusUser='active'`, {
+            type:db.sequelize.QueryTypes.SELECT
+        })
         .then(result=>result)
     }catch(err){throw new Error(err)}
 }
 
-findOTP = async (phone)=>{
+async function findOTP(phone){
     try{
         return await db.sequelize
         .query(`select * from otp where phone=${phone} order by initiatedDateTimeCode desc`,{
@@ -52,7 +54,7 @@ findOTP = async (phone)=>{
     }catch(err){throw new Error(err)}
 }
 
-findValidOTP = async (phone)=>{
+async function findValidOTP(phone){
     try{
         return await db.sequelize
         .query(`select * from otp where phone=${phone} and status='valid' order by initiatedDateTimeCode desc`,{
@@ -65,7 +67,7 @@ findValidOTP = async (phone)=>{
 }
 
 
-updateOTP = async(otpId)=>{
+async function updateOTP(otpId){
     try{
         return await db.sequelize
         .query(`update otp set status='invalid' where idOTP=${otpId}`)
@@ -74,15 +76,14 @@ updateOTP = async(otpId)=>{
 }
 
 function existingUserToken(user){
-    const {idUser, phoneUser, roleUser, firstNameUser, dateOfBirthUser, genderUser, emailUser, lastNameUser}=user
-    return jwt.sign({idUser, phoneUser, roleUser, firstNameUser, dateOfBirthUser, genderUser, emailUser, lastNameUser}, process.env.TOKENSECRET)
+    const {phoneUser}=user
+    return jwt.sign({phoneUser}, process.env.TOKENSECRET)
 }
 
-createLog = async(action)=>{
+createLog = async(action, idUser)=>{
     try{
         return await db.sequelize
-        .query(`insert into logs (nameEvent) values('${action}')`)
-        .then(result=>true)
+        .query(`insert into logs (nameEvent,idUser) values('${action}',${idUser})`)
     }catch(err){throw new Error(err)}
 }
 
@@ -94,10 +95,11 @@ exports.loginPhone = async(req, res, next)=>{
             //before you write a new code in the db delete the previous one.
             //make previous otpCode for this number invalid
             const otp = await findOTP(phone)
+            console.log(otp)
             let  upDate=''
-            if(otp!==undefined) 
-            upDate = await updateOTP(otp.idOTP)
-            if(upDate){
+            if(otp!==undefined) upDate = await updateOTP(otp.idOTP)
+            console.log(upDate)
+            if((otp!==undefined && upDate) || otp===undefined){
                 const createdOtp = await createOTP(phone)
                 if(createdOtp===true){
                     //insert api to send code to user here
@@ -122,8 +124,8 @@ exports.login = async (req, res, next)=>{
                 if(user.length===1 && user[0].roleUser !=='patient'){
                     const valid = await bcrypt.compare(pwd,user[0].passwordUser)
                     if(valid){
-                        const logs = createLog('signin')//write to the logs table
-                        if(logs!==true) console.log('there was a problem login this user signin')
+                        const logs = createLog('signin',user[0].idUser)//write to the logs table
+                        if(logs.length!==2) console.log('there was a problem login this user signin')
                         return res.json({ role:user[0].roleUser, token:existingUserToken(user[0]) })
                         //prepare jwt and return
                     } else throw new Error ('Invalid Password')
@@ -137,16 +139,16 @@ exports.login = async (req, res, next)=>{
                         const user = await findUser(phone)
                         if(user.length===1 && user[0].roleUser==='patient'){
                             const upDate = await updateOTP(otp.idOTP) //make OTP code invalid
-                            const logs = createLog('signin')//write to the logs table
-                            if(logs!==true) console.log('there was a problem login this user signin')
+                            const logs = createLog('signin',user[0].idUser)//write to the logs table
+                            if(logs.length!==2) console.log('there was a problem login this user signin')
                             if(!upDate) console.log('there was a problem removing OTPCode')
-                            if(!logs) console.log('there was a problem login this user signin')
                             return res.json({ role:'patient', token:existingUserToken(user[0]) })//generate patient token
                         } 
                         const roleUser='visitor'
-                        const token = jwt.sign({phone, roleUser}, process.env.TOKENSECRET)
-                        return res.json({ role:'visitor', token:token })//generate visitor jwt and send as response
-                    }else throw new Error('Invalid code')
+                        const phoneUser = phone
+                        const token = jwt.sign({phoneUser}, process.env.TOKENSECRET)
+                        return res.json({ role:roleUser, token:token })//generate visitor jwt and send as response
+                    }else throw new Error('Invalid Code')
                 }else throw new Error('No otp code for this number. resend code')
                 break;
             default:
