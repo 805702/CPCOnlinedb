@@ -4,7 +4,7 @@ const express = require('express');
 const cors = require('cors');
 
 const db = require('./models');
-const {demand, auth, user, examinations} = require('./routes')
+const {demand, auth, user, examinations, result} = require('./routes')
 const handle = require('./handlers');
 
 const port = process.env.PORT;
@@ -28,6 +28,7 @@ app.use('/api/auth',auth);
 app.use('/api/demand',demand);
 app.use('/api/user/',user);
 app.use('/api/exams/', examinations)
+app.use('/api/result', result)
 
 app.use(handle.notFound)
 app.use(handle.errors);

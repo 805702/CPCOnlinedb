@@ -94,15 +94,19 @@ function toTitleCase(data){
 
 async function dbMedPersonnel (med, t){
     try{
-        let name = toTitleCase(med.name)
+        med.name = toTitleCase(med.name)
+        if(med.name==='' || med.title===''){
+            med.title='Dr'
+            med.name='XX'
+        }
         let medP = await db.sequelize
-        .query(`select * from MedicalPersonnel where title='${med.title}' and name= '${name}'`,{
+        .query(`select * from MedicalPersonnel where title='${med.title}' and name= '${med.name}'`,{
             type:db.sequelize.QueryTypes.SELECT,
             transaction:t
         })
 
         if(medP.length===1)return medP[0].idMedicalPersonnel
-        else return createMedPersonnel(med, t)
+        else return await createMedPersonnel(med, t)
     }catch(err){throw new Error(err)}
 }
 
@@ -281,6 +285,12 @@ async function createDemandTransaction (identification, medPersonnel,demandAmoun
         let paymentExist = await dbPayment(demandAmount, payingPhone, payingService, demandExist, t)
         let medExamDemandHasExamExist = await dbMedicalExamDemand_has_Examination(demandExist, examIdlist, t)
         let medicalExamResultExist = await dbMedicalExamResult(medExamDemandHasExamExist, t)
+
+        let transactionSIN = await db.sequelize.query(`select SIN from medicalExamDemand where idMedicalExamDemand=${demandExist}`,{
+            type:db.sequelize.QueryTypes.SELECT,
+            transaction:t
+        })
+        return transactionSIN
     }catch(err){throw new Error(err)}
 }
 
@@ -297,14 +307,14 @@ exports.createTextDemand=async(req, res, next)=>{
             entryMethod
         } = req.body
 
-        await createDemandTransaction(identification, medPersonnel, demandAmount, payingPhone, payingService, choosenExam, entryMethod, t)
+        let transactionSIN = await createDemandTransaction(identification, medPersonnel, demandAmount, payingPhone, payingService, choosenExam, entryMethod, t)
         .catch(err=>{
             res.json({error:"Couldn't complete"})
             throw new Error(err)
         })
         t.commit()
         t.afterCommit(()=>{
-            res.json({success:'successfull'})
+            res.json(transactionSIN[0])
         })
     }catch(err){return next(err)}
 }
