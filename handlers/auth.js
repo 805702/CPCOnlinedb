@@ -76,8 +76,8 @@ async function updateOTP(otpId){
 }
 
 function existingUserToken(user){
-    const {phoneUser}=user
-    return jwt.sign({phoneUser}, process.env.TOKENSECRET)
+    const {phoneUser, idUser, roleUser}=user
+    return jwt.sign({phoneUser,idUser, roleUser}, process.env.TOKENSECRET)
 }
 
 createLog = async(action, idUser)=>{
@@ -126,7 +126,10 @@ exports.login = async (req, res, next)=>{
                     if(valid){
                         const logs = createLog('signin',user[0].idUser)//write to the logs table
                         if(logs.length!==2) console.log('there was a problem login this user signin')
-                        return res.json({ role:user[0].roleUser, token:existingUserToken(user[0]) })
+
+                        const {phoneUser, firstNameUser, lastNameUser, genderUser, dateOfBirthUser, roleUser, emailUser} = user[0]
+                        let theUser = { phoneUser, firstNameUser, lastNameUser, genderUser, dateOfBirthUser, roleUser, emailUser }
+                        return res.json({ theUser, token:existingUserToken(user[0]) })
                         //prepare jwt and return
                     } else throw new Error ('Invalid Password')
                 } else throw new Error('Many users with same phone')
@@ -142,12 +145,16 @@ exports.login = async (req, res, next)=>{
                             const logs = createLog('signin',user[0].idUser)//write to the logs table
                             if(logs.length!==2) console.log('there was a problem login this user signin')
                             if(!upDate) console.log('there was a problem removing OTPCode')
-                            return res.json({ role:'patient', token:existingUserToken(user[0]) })//generate patient token
+                            
+                            const {phoneUser, firstNameUser, lastNameUser, genderUser, dateOfBirthUser, roleUser, emailUser} = user[0]
+                            let theUser = { phoneUser, firstNameUser, lastNameUser, genderUser, dateOfBirthUser, roleUser, emailUser }
+                            return res.json({ theUser, token:existingUserToken(user[0]) })//generate patient token
                         } 
                         const roleUser='visitor'
                         const phoneUser = phone
-                        const token = jwt.sign({phoneUser}, process.env.TOKENSECRET)
-                        return res.json({ role:roleUser, token:token })//generate visitor jwt and send as response
+                        let theUser ={phoneUser, roleUser}
+                        const token = jwt.sign({phoneUser, roleUser}, process.env.TOKENSECRET)
+                        return res.json({theUser, token:token })//generate visitor jwt and send as response
                     }else throw new Error('Invalid Code')
                 }else throw new Error('No otp code for this number. resend code')
                 break;
@@ -207,4 +214,42 @@ generateEndDateTime =()=>{
     time=time[0]+':'+time[1]+':'+time[2]
     now = now[3]+'-'+now[2]+'-'+now[1]+' '+time
     return now;
+}
+
+async function getTokenUserData(decodedToken){
+    try{
+        const {phoneUser, roleUser} = decodedToken
+        switch(roleUser){
+            case 'visitor':
+                return {phoneUser, roleUser}
+            default:
+                const theUser = await db.sequelize.query(`
+                select phoneUser, firstNameUser, lastNameUser, dateOfBirthUser, genderUser, emailUser, roleUser, idUser from user where phoneUser=${phoneUser} and roleUser='${roleUser}' and idUser=${decodedToken.idUser}
+                `,{
+                    type:db.sequelize.QueryTypes.SELECT
+                })
+                return theUser[0]
+        }
+    }catch(err){throw new Error(err)}
+}
+
+exports.validateToken=async(req,res,next)=>{
+    try{
+        let token = req.body.token
+        // const token = req.headers.authorization.split(" ")[1];
+
+        let verify = jwt.verify(token, process.env.TOKENSECRET, (err, decoded) => {
+          if (err) {
+            throw new Error("Failed to authenticate token");
+          } else {
+            return decoded
+            // let theUser = await getTokenUserData(decoded)
+            // res.json({theUser})
+          }
+        });
+        if(!verify.err){
+            let theUser = await getTokenUserData(verify)
+            res.json({theUser})
+        }else (next(err))
+    }catch(err){return next(err)}
 }

@@ -13,7 +13,10 @@ const app = express();
 app.use(cors({
 origin: 'http://localhost:3000'
 }));
+
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use('/static', express.static('uploads'))
 
 app.get('/', (req, res)=>{
     db.sequelize.query('select * from country',{
