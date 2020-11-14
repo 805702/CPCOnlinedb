@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const request = require('request')
 
 const db = require('../models');
 
@@ -27,9 +28,14 @@ function generateOTPCode(){
 
 async function createOTP (phone){
     try{
-        return await db.sequelize
-        .query(`INSERT INTO OTP (code,endDateTimeCode,phone) VALUES (${generateOTPCode()},"${generateEndDateTime()}", ${phone});`)
-        .then(result=>{return true})
+        let code = generateOTPCode()
+        return db.sequelize
+        .query(`INSERT INTO OTP (code,endDateTimeCode,phone) VALUES (${code},"${generateEndDateTime()}", ${phone});`)
+        .then(result=>{
+            const resp= {res:true, code}
+            return resp
+        })
+        .catch(err=>{throw Error(err)})
     }catch(err){throw new Error(err)}
 }
 
@@ -101,7 +107,19 @@ exports.loginPhone = async(req, res, next)=>{
             console.log(upDate)
             if((otp!==undefined && upDate) || otp===undefined){
                 const createdOtp = await createOTP(phone)
-                if(createdOtp===true){
+                console.log(
+                  `https://api.1s2u.io/bulksms?username=ppwangun&password=perfect&mno=+237${phone}&sid=CPC&msg=Your_Code_is_${createdOtp.code}&mt=0&fl=0`
+                );
+                request
+                  .get( `https://api.1s2u.io/bulksms?username=ppwangun&password=perfect&mno=+237${phone}&sid=CPC&msg=Your_Code_is_${createdOtp.code}&mt=0&fl=0` )
+                  .on("response", (response) => {
+                    // console.log(error)
+                    // console.log(response)
+                    if (response.statusCode == 200) {
+                    //   console.log(response);
+                    }
+                  });
+                if(createdOtp.res===true){
                     //insert api to send code to user here
                     return res.json({method:'code'})
                 } else throw new Error("Sequelize result for Insert is more than 2 in array")

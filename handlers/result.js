@@ -46,7 +46,7 @@ async function dbDemandHasExamJoin(phoneUser){
         user INNER JOIN medicalExamDemand t1  ON user.idUser = t1.idUser
         INNER JOIN medicalExamDemand_has_Examination t2 ON t1.idMedicalExamDemand = t2.idMedicalExamDemand
         INNER JOIN examination t3 ON t2.idExamination = t3.idExamination
-        WHERE t1.dateConfirmed IS NOT NULL and t1.paymentStatus='resolved' and user.phoneUser = ${phoneUser}
+        WHERE (t1.dateConfirmed IS NOT NULL or t1.entryMethod='special') and t1.paymentStatus='resolved' and user.phoneUser = ${phoneUser}
         ORDER BY t1.dateCreated desc
         `,{
             type:db.sequelize.QueryTypes.SELECT
@@ -54,12 +54,27 @@ async function dbDemandHasExamJoin(phoneUser){
     }catch(err){throw new Error(err)}
 }
 
+async function dbGetSpecialResults(phoneUser){
+    try {
+        return await db.sequelize.query(`
+        SELECT SIN as idMedExamDemandExamination, idMedicalExamDemand, SIN as nameExamination, SIN as daysToResult, SIN as bValue, GIN, resultRef, dateCreated 
+        FROM User
+        INNER JOIN medicalExamDemand 
+        ON user.idUser = medicalExamDemand.idUser 
+        WHERE resultRef IS NOT NULL AND phoneUser =${phoneUser} AND entryMethod='special' AND GIN IS NOT NULL   ;
+        `,{
+            type:db.sequelize.QueryTypes.SELECT
+        });
+    } catch (error) {return Error(err)}
+}
+
 exports.getPatientResultData = async (req, res, next)=>{
     try{
         const phoneUser = req.body.phone
-
+        let specialJoin = await dbGetSpecialResults(phoneUser)
         let medExamResult = await dbmedicalExamResult(phoneUser)
-        let demandHasExamJoin = await dbDemandHasExamJoin(phoneUser)
+        let normalJoin = await dbDemandHasExamJoin(phoneUser)
+        let demandHasExamJoin = [...normalJoin, ...specialJoin]
         let user = await getUser(phoneUser)
         res.json({ demandHasExamJoin, medExamResult, user })
     }catch(err){
@@ -261,4 +276,99 @@ exports.getDueResults=async (req, res, next)=>{
 
         res.json({dbRes})
     }catch(err){return next(err)}
+}
+
+async function lookForPatient(phonePatient, t){
+    try {
+        let dbRes = await db.sequelize.query(`
+        SELECT idUser
+        FROM  User
+        WHERE phoneUser = ${phonePatient}
+        `,{
+            type:db.sequelize.QueryTypes.SELECT,
+            transaction:t
+        })
+
+        if(dbRes.length===1) return dbRes[0].idUser
+        return false
+    } catch (error) {return Error(error)}
+}
+
+async function createPatientWithPhone(phonePatient,t){
+    try {
+        let dbRes = await db.sequelize.query(`
+        INSERT INTO User (phoneUser,idTown)
+        VALUES (${phonePatient}, 1)
+        `,{
+            type:db.sequelize.QueryTypes.INSERT,
+            transaction:t
+        })
+        return dbRes[0]
+    } catch (error) {return Error(error)}
+}
+
+async function createSpecialDemand(idPatient, GIN, resultRef, t){
+    try {
+        let dbRes = await db.sequelize.query(`
+        INSERT INTO medicalExamDemand (paymentStatus, receptionStatus, entryMethod, GIN, idUser, idAgency, resultRef )
+        VALUES ('resolved', 'done', 'special', '${GIN}', ${idPatient}, 1, '${resultRef}' )
+        `,{
+            type:db.sequelize.QueryTypes.INSERT,
+            transaction: t
+        })
+
+        return dbRes[0]
+    } catch (error) {return Error(error)}
+}
+
+async function lookForDemand(GIN, t){
+    try {
+        let dbRes = await db.sequelize.query(`
+        SELECT idMedicalExamDemand
+        FROM medicalExamDemand
+        WHERE GIN = '${GIN}'
+        `,{
+            type:db.sequelize.QueryTypes.SELECT,
+            transaction: t
+        })
+
+        if(dbRes.length ===1 ) return dbRes[0].idMedicalExamDemand
+        return false
+    } catch (error) {return Error(error)}
+}
+
+async function createSpecialPayment(idDemand, t){
+    try {
+        let dbRes = await db.sequelize.query(`
+        INSERT INTO payment (paymentStatus, idMedicalExamDemand, dateResolved)
+        VALUES('resolved', ${idDemand}, current_timestamp);
+        `,{
+            type:db.sequelize.QueryTypes.INSERT,
+            transaction: t
+        });
+
+        return dbRes[0]
+    } catch (error) {return Error(error)}
+}
+
+exports.specialResults=async(req, res, next)=>{
+    try {
+        const t = await db.sequelize.transaction();
+        const { GIN, phonePatient, idUploader } = req.body
+        let path = req.file.path.split('\\')[1]
+
+        let idPatient = await lookForPatient(phonePatient, t)
+        if(!idPatient)idPatient = await createPatientWithPhone(phonePatient, t)
+        let idDemand = await lookForDemand(GIN, t)
+        let idPayment = null
+        if(!idDemand){
+            idDemand = await createSpecialDemand(idPatient, GIN, path, t)
+            idPayment = await createSpecialPayment(idDemand,t)
+        }
+        else throw new Error("This GIN already Exist")
+        t.commit();
+        t.afterCommit(() => {
+          return res.json({success:idPayment});
+        });
+    } catch (error) {return next (error)}
 }

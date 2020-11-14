@@ -9,9 +9,8 @@ module.exports = multer({
       cb(null, "uploads");
     },
     filename: (req, file, cb) => {
-      console.log(req.body);
       let nameFile = uuidV4
-      cb(null, nameFile+'.pdf');
+      cb(null, nameFile+'.'+file.mimetype.split('/')[1]);
     }
   }),
   fileFilter: (req, file, cb) => {
