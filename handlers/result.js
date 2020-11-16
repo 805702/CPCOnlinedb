@@ -1,5 +1,4 @@
 const db = require('../models');
-const cloudinary = require("../utils/cloudinary");
 
 //1. the first information table is the medicalExamDemand_has_Examination that will have an inner join with the  examination table and another inner join with MedicalExamDemand.
 // the structure of 1 will be the following columns: 
@@ -15,7 +14,7 @@ async function getUser(phoneUser){
         });
         if(user.length===1) return {user:user[0]}
         return {user:{roleUser:'visitor'}}
-    }catch(err){ throw new Error(err)}
+    }catch(err){ throw Error(err)}
 }
 
 async function dbmedicalExamResult(phoneUser){
@@ -33,7 +32,7 @@ async function dbmedicalExamResult(phoneUser){
         `,{
             type:db.sequelize.QueryTypes.SELECT
         })
-    }catch(err){throw new Error(err)}
+    }catch(err){throw Error(err)}
 }
 
 
@@ -51,7 +50,7 @@ async function dbDemandHasExamJoin(phoneUser){
         `,{
             type:db.sequelize.QueryTypes.SELECT
         })
-    }catch(err){throw new Error(err)}
+    }catch(err){throw  Error(err)}
 }
 
 async function dbGetSpecialResults(phoneUser){
@@ -65,7 +64,7 @@ async function dbGetSpecialResults(phoneUser){
         `,{
             type:db.sequelize.QueryTypes.SELECT
         });
-    } catch (error) {return Error(err)}
+    } catch (error) {throw Error(err)}
 }
 
 exports.getPatientResultData = async (req, res, next)=>{
@@ -82,7 +81,6 @@ exports.getPatientResultData = async (req, res, next)=>{
     }
 }
 
-
 async function setPostpone(postpone, GIN, dueDate, dbAudit, t){
     try{
         return await db.sequelize.query(`
@@ -97,7 +95,7 @@ async function setPostpone(postpone, GIN, dueDate, dbAudit, t){
             type: db.sequelize.QueryTypes.UPDATE,
             transaction: t
         });
-    }catch(err){throw new Error(err)}
+    }catch(err){throw Error(err)}
 }
 
 async function setResultResultRef(resultRef, GIN, dueDate, idUser, t){
@@ -117,7 +115,7 @@ async function setResultResultRef(resultRef, GIN, dueDate, idUser, t){
             type: db.sequelize.QueryTypes.UPDATE,
             transaction: t
         });
-    }catch(err){throw new Error(err)}
+    }catch(err){throw Error(err)}
 }
 
 async function setDemandResultRef(resultRef, GIN, dueDate, t){
@@ -135,7 +133,7 @@ async function setDemandResultRef(resultRef, GIN, dueDate, t){
             type: db.sequelize.QueryTypes.UPDATE,
             transaction: t
         });
-    }catch(err){throw new Error(err)}
+    }catch(err){throw Error(err)}
 }
 
 async function dbPostponeIds(GIN, dueDate, t){

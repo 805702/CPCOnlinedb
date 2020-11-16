@@ -108,10 +108,10 @@ exports.loginPhone = async(req, res, next)=>{
             if((otp!==undefined && upDate) || otp===undefined){
                 const createdOtp = await createOTP(phone)
                 console.log(
-                  `https://api.1s2u.io/bulksms?username=ppwangun&password=perfect&mno=+237${phone}&sid=CPC&msg=Your_Code_is_${createdOtp.code}&mt=0&fl=0`
+                  `https://api.1s2u.io/bulksms?username=ppwangun&password=perfect&mno=237${phone}&sid=CPC&msg=Your_Code_is_${createdOtp.code}&mt=0&fl=0`
                 );
                 request
-                  .get( `https://api.1s2u.io/bulksms?username=ppwangun&password=perfect&mno=+237${phone}&sid=CPC&msg=Your_Code_is_${createdOtp.code}&mt=0&fl=0` )
+                  .get( `https://api.1s2u.io/bulksms?username=ppwangun&password=perfect&mno=237${phone}&sid=CPC&msg=Your_Code_is_${createdOtp.code}&mt=0&fl=0` )
                   .on("response", (response) => {
                     // console.log(error)
                     // console.log(response)
