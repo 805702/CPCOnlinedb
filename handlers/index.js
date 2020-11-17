@@ -3,7 +3,8 @@ module.exports = {
     ...require('./demand'),
     ...require('./user'),
     ...require('./examinations'),
-    ...require('./result')
+    ...require('./result'),
+    ...require('./examCategory')
 }
 
 module.exports.notFound=(req, res, next)=>{
