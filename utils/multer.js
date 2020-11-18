@@ -9,13 +9,18 @@ module.exports = multer({
       cb(null, "uploads");
     },
     filename: (req, file, cb) => {
-      let nameFile = uuidV4
-      cb(null, nameFile+'.'+file.mimetype.split('/')[1]);
+      console.error(file)
+      let nameFile = file.originalname.split(' ')
+      nameFile = nameFile.join('_')
+      nameFile = nameFile.split('.')
+      nameFile.pop()
+      nameFile = nameFile.join('_')
+      cb(null, uuidV4+'_'+nameFile+'.'+file.mimetype.split('/')[1]);
     }
   }),
   fileFilter: (req, file, cb) => {
     let ext = path.extname(file.originalname);
-    if (ext !== ".jpg" && ext !== ".jpeg" && ext !== ".png" && ext !== ".pdf") {
+    if (ext.toLowerCase() !== ".jpg" && ext.toLowerCase() !== ".jpeg" && ext.toLowerCase() !== ".png" && ext.toLowerCase() !== ".pdf") {
       cb(new Error("File type is not supported"), false);
       return;
     }

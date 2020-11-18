@@ -3,7 +3,7 @@ const db = require('../models');
 exports.getExams = async (req, res, next)=>{
     try{
         let exams = await db.sequelize.query(`
-        SELETCT idExamination,nameExamination,codeExamination,bValue,dateCreated,daysToResult,idExamCategory
+        SELECT idExamination,nameExamination,codeExamination,bValue,dateCreated,daysToResult,idExamCategory
         FROM examination
         WHERE statusExamination='active'`,{
             type:db.sequelize.QueryTypes.SELECT

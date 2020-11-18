@@ -299,7 +299,7 @@ async function createDemandTransaction (identification, medPersonnel,demandAmoun
             transaction:t
         })
         return transactionSIN
-    }catch(err){throw new Error(err)}
+    }catch(err){throw Error(err)}
 }
 
 exports.createTextDemand=async(req, res, next)=>{
@@ -481,10 +481,12 @@ exports.createImageDemand=async(req, res, next)=>{
         // Upload image to cloudinary
         for (let index = 0; index < req.files.length; index++) {
             const element = req.files[index];
-            const result = await cloudinary.uploader.upload(element.path)
+            URL_s.push(element.path.split('\\')[1])
+            // const result = await cloudinary.uploader.upload(element.path)
 
-            URL_s.push(result.secure_url)
+            // URL_s.push(result.secure_url)
         }
+        console.log(URL_s)
 
         let transactionSIN = await createDemandTransaction(
             identification,
@@ -553,6 +555,8 @@ async function getDemandId (SIN,t){
             type: db.sequelize.QueryTypes.SELECT,
             transaction:t
         })
+        if(dbRes.length===1)return dbRes[0].idMedicalExamDemand
+        else throw new Error("Many demands where found with same SIN")
     }catch(err){throw Error(err)}
 }
 
@@ -562,7 +566,7 @@ async function updateToCompletePayment(SIN, amount, t){
         UPDATE payment t1
         INNER JOIN medicalExamDemand t2
         ON t1.idMedicalExamDemand = t2.idMedicalExamDemand
-        SET amount = ${amount},
+        SET amount = ${amount}
         WHERE t2.SIN = '${SIN}'
         `,{
             type:db.sequelize.QueryTypes.UPDATE,
@@ -708,4 +712,20 @@ exports.specialDemands = async(req, res, next)=>{
 
 
     }catch(err){return next(err)}
+}
+
+exports.getDemandsToComplete=async(req, res, next)=>{
+    try {
+        let dbRes = await db.sequelize.query(`
+            SELECT SIN, dateCreated, imageRef
+            FROM MedicalExamDemand t1
+            INNER JOIN MedicalExamImage t2
+            ON t1.idMedicalExamDemand = t2.idMedicalExamDemand
+            WHERE SIN IS NOT NULL AND entryMethod='image' AND dateCompleted IS NULL
+        `,{
+            type:db.sequelize.QueryTypes.SELECT
+        })
+
+        return res.json({dbRes})
+    } catch (error) {return next(error)}
 }
