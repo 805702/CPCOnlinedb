@@ -593,9 +593,8 @@ exports.completeDemand=async(req, res, next)=>{
 
 async function dbAwaitingPayment(idUser){
     try{
-        // WHERE t1.dateConfirmed IS NULL and t1.paymentStatus='resolved' and user.phoneUser = ${phoneUser}
         return  await db.sequelize.query(`
-        SELECT idMedExamDemandExamination, t1.idMedicalExamDemand, nameExamination, daysToResult, bValue, SIN as GIN, t1.resultRef, t1.dateCreated
+        SELECT t1.SIN, t3.bValue, t3.idExamination, t3.nameExamination, t1.dateCreated
         FROM 
         user INNER JOIN medicalExamDemand t1  ON user.idUser = t1.idUser
         INNER JOIN medicalExamDemand_has_Examination t2 ON t1.idMedicalExamDemand = t2.idMedicalExamDemand
@@ -603,7 +602,7 @@ async function dbAwaitingPayment(idUser){
         INNER JOIN payment t4 
         ON t4.idMedicalExamDemand = t1.idmedicalExamDemand
         WHERE t4.dateResolved IS NULL and t1.dateCompleted is not null and t1.paymentStatus='pending' and user.idUser = ${idUser}
-        ORDER BY t1.dateCreated desc
+        ORDER BY t1.dateCreated ASC
         `,{
             type:db.sequelize.QueryTypes.SELECT
         })
@@ -613,10 +612,10 @@ async function dbAwaitingPayment(idUser){
 exports.awaitingPayment=async(req, res, next)=>{
     try{
         const { idUser } = req.body
-        const demandHasExamJoin = await dbAwaitingPayment(idUser)
+        const patientAwaitingPayment = await dbAwaitingPayment(idUser)
         
 
-        return res.json({demandHasExamJoin})
+        return res.json({patientAwaitingPayment})
     }catch(err){return next(err)}
 }
 
@@ -626,7 +625,7 @@ async function updateToPayPayment(SIN,t){
         UPDATE payment t1
         INNER JOIN medicalExamDemand t2
         ON t1.idMedicalExamDemand = t2.idMedicalExamDemand
-        SET paymentStatus ='resolved',
+        SET t1.paymentStatus ='resolved',
             dateResolved = current_timestamp
         WHERE t2.SIN = '${SIN}'
         `,{
@@ -652,7 +651,7 @@ async function updateToPayDemand(SIN, t ){
 exports.completePayment=async(req,res,next)=>{
     try{
         const { SIN } = req.body
-        const t = transaction
+        const t = await db.sequelize.transaction()
         const dbDemand = await updateToPayDemand(SIN, t)
         const dbPayment = await updateToPayPayment(SIN, t)
         t.commit()
@@ -722,6 +721,25 @@ exports.getDemandsToComplete=async(req, res, next)=>{
             INNER JOIN MedicalExamImage t2
             ON t1.idMedicalExamDemand = t2.idMedicalExamDemand
             WHERE SIN IS NOT NULL AND entryMethod='image' AND dateCompleted IS NULL
+        `,{
+            type:db.sequelize.QueryTypes.SELECT
+        })
+
+        return res.json({dbRes})
+    } catch (error) {return next(error)}
+}
+
+exports.getPatientToComplete=async(req, res, next)=>{
+    try {
+        const { idUser } = req.body
+        let dbRes = await db.sequelize.query(`
+            SELECT SIN, dateCreated, imageRef
+            FROM MedicalExamDemand t1
+            INNER JOIN MedicalExamImage t2
+            ON t1.idMedicalExamDemand = t2.idMedicalExamDemand
+            INNER JOIN User t3
+            ON t3.idUser = t1.idUser
+            WHERE SIN IS NOT NULL AND entryMethod='image' AND dateCompleted IS NULL AND t1.idUser=${idUser}
         `,{
             type:db.sequelize.QueryTypes.SELECT
         })

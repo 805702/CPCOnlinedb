@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const request = require('request')
 
 const db = require('../models');
+const { sendSMS } = require('../utils/sendSMS');
 
 //work on adding cron jobs to make otp codes invalid
 //work on generating the correct generateEndDateTime
@@ -107,18 +108,8 @@ exports.loginPhone = async(req, res, next)=>{
             console.log(upDate)
             if((otp!==undefined && upDate) || otp===undefined){
                 const createdOtp = await createOTP(phone)
-                console.log(
-                  `https://api.1s2u.io/bulksms?username=ppwangun&password=perfect&mno=237${phone}&sid=CPC&msg=Your_Code_is_${createdOtp.code}&mt=0&fl=0`
-                );
-                request
-                  .get( `https://api.1s2u.io/bulksms?username=ppwangun&password=perfect&mno=237${phone}&sid=CPC&msg=Your_Code_is_${createdOtp.code}&mt=0&fl=0` )
-                  .on("response", (response) => {
-                    // console.log(error)
-                    // console.log(response)
-                    if (response.statusCode == 200) {
-                    //   console.log(response);
-                    }
-                  });
+                const message = `Your CPCOnline access code is ${createdOtp.code}\nGo to\nhttp://localhost:3000/code_${phone}\nto use your code`
+                sendSMS(657140183, message)
                 if(createdOtp.res===true){
                     //insert api to send code to user here
                     return res.json({method:'code'})

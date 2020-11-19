@@ -1,4 +1,5 @@
 const db = require('../models');
+const { sendSMS } = require('../utils/sendSMS');
 
 //1. the first information table is the medicalExamDemand_has_Examination that will have an inner join with the  examination table and another inner join with MedicalExamDemand.
 // the structure of 1 will be the following columns: 
@@ -196,6 +197,8 @@ exports.uploadDemandResult=async( req, res, next )=>{
 
         const dbResultResultRef = await setResultResultRef(path, GIN, dueDate, idUser, t)
         const dbDemandResultRef = await setDemandResultRef(path, GIN, dueDate, t)
+        const message=`Your results for your Demand with\nid ${GIN}\nhave been uploaded.\n\nGo to http://localhost:3000/\nto get your results`
+        sendSMS(phonePatient, message)
         t.commit();
         t.afterCommit(() => {
           return res.json({success:dbDemandResultRef});
@@ -362,6 +365,8 @@ exports.specialResults=async(req, res, next)=>{
         if(!idDemand){
             idDemand = await createSpecialDemand(idPatient, GIN, path, t)
             idPayment = await createSpecialPayment(idDemand,t)
+            const message=`Your results for your Demand with\nid ${GIN}\nhave been uploaded.\n\nGo to http://localhost:3000/\nto get your results`
+            sendSMS(phonePatient, message)
         }
         else throw new Error("This GIN already Exist")
         t.commit();

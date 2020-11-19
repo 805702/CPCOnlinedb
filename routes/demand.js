@@ -5,6 +5,7 @@ const handle = require('../handlers')
 router.post('/textDemand', handle.createTextDemand)
 router.get('/confirmDemands', handle.getDemandsToConfirm) //list of demands awaiting confirmation
 router.get('/getDemandsToComplete', handle.getDemandsToComplete) //list of demands awaiting completion
+router.post("/getPatientToComplete", handle.getPatientToComplete); //patient list of demands awaiting completion
 router.post('/treatDemand', handle.treatDemand) //reception of demand
 router.post('/SINData', handle.getSINData)
 router.post('/confirmDemand', handle.confirmDemand) //confirm a demand
