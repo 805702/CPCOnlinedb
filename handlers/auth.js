@@ -16,7 +16,7 @@ exports.register = async (req, res, next)=>{
 
         const ans = await bcrypt.compare(user, hashed)
 
-        res.json(hashed);
+        res.json({hashed, ans});
     }catch(err){
         return next(err);
     }
@@ -109,7 +109,7 @@ exports.loginPhone = async(req, res, next)=>{
             if((otp!==undefined && upDate) || otp===undefined){
                 const createdOtp = await createOTP(phone)
                 const message = `Your CPCOnline access code is ${createdOtp.code}\nGo to\nhttp://localhost:3000/code_${phone}\nto use your code`
-                sendSMS(657140183, message)
+                let sms = await sendSMS(phone, message)
                 if(createdOtp.res===true){
                     //insert api to send code to user here
                     return res.json({method:'code'})
@@ -120,6 +120,12 @@ exports.loginPhone = async(req, res, next)=>{
     }catch(err){next(err);}
 }
 
+exports.logout=async(req, res, next)=>{
+    try {
+        // const {phoneUser}
+        res.json({log:'hello wlrld'})
+    } catch (error) {return next(error)}
+}
 
 exports.login = async (req, res, next)=>{
     try{

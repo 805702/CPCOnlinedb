@@ -314,7 +314,7 @@ exports.createTextDemand=async(req, res, next)=>{
             demandAmount,
             entryMethod
         } = req.body
-
+        console.log("i'm here")
         let transactionSIN = await createDemandTransaction(identification, medPersonnel, demandAmount, payingPhone, payingService, choosenExam, entryMethod, null, t)
         .catch(err=>{
             res.json({error:"Couldn't complete"})

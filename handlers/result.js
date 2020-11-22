@@ -189,6 +189,24 @@ exports.postponeResult = async(req, res, next) =>{
     }catch(err){return next(err)}
 }
 
+async function getPhonePatient(GIN, t){
+    try {
+        const phonePatient = await db.sequelize.query(`
+        SELECT phoneUser
+        FROM medicalExamDemand t1
+        INNER JOIN User t2
+        ON t1.idUser = t2.idUser
+        WHERE t1.GIN = '${GIN}'
+        `,{
+            type:db.sequelize.QueryTypes.SELECT,
+            transaction:t
+        })
+
+        if(phonePatient.length===1) return phonePatient[0].phoneUser
+        else throw new Error('Patient not found')
+    } catch (error) {throw Error(error)}
+}
+
 exports.uploadDemandResult=async( req, res, next )=>{
     try {
         const t = await db.sequelize.transaction();
@@ -197,6 +215,7 @@ exports.uploadDemandResult=async( req, res, next )=>{
 
         const dbResultResultRef = await setResultResultRef(path, GIN, dueDate, idUser, t)
         const dbDemandResultRef = await setDemandResultRef(path, GIN, dueDate, t)
+        const phonePatient = await getPhonePatient(GIN, t)
         const message=`Your results for your Demand with\nid ${GIN}\nhave been uploaded.\n\nGo to http://localhost:3000/\nto get your results`
         sendSMS(phonePatient, message)
         t.commit();
